@@ -1,0 +1,62 @@
+# Environment variables
+.env
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual environments
+.venv/
+venv/
+ENV/
+env/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Bob IDE workspace config
+.bob/
+# AWS credentials and local config
+.aws/
+
+# AgentCore local runtime artifacts
+.agentcore/
+
+# Secrets / credential files (never commit these)
+*.secret
+*.secrets
+secrets.json
+credentials.json
+*.pem
+*.key
+.env.*
+!.env.example
+
+# Personal/local script overrides (contain real IDs)
+*.local.sh
