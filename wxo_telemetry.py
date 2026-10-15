@@ -17,6 +17,8 @@ Configuration (all via environment variables; nothing secret is stored in code):
     WXO_AGENT_NAME           name used in span names, default retail_banking_support
     WXO_CAPTURE_CONTENT      "true" (default) or "false"; false omits user input and agent
                              output from exported spans
+    WXO_REDACT_SECRETS       "true" (default) or "false"; false sends PINs/passwords unmasked
+                             in exported spans (applies to both draft and live environments).
 """
 from __future__ import annotations
 
@@ -124,7 +126,9 @@ class WxoSpanExporter(SpanExporter):
         capture_content: bool,
         base_resource: Resource,
         token_provider: Callable[[], tuple[str, float]] = _exchange_token,
+        redact_secrets: bool = True,
     ) -> None:
+        self._redact = _redact if redact_secrets else (lambda text: text)
         self._endpoint = endpoint
         self._tenant_id = tenant_id
         self._agent_id = agent_id
@@ -205,9 +209,9 @@ class WxoSpanExporter(SpanExporter):
                 user_text = _text_from_blocks(_event_value(span, "gen_ai.user.message", "content"))
                 answer = _event_value(span, "gen_ai.choice", "message").strip()
                 if user_text:
-                    new_attrs["input"] = _redact(user_text)[:_MAX_ATTR_CHARS]
+                    new_attrs["input"] = self._redact(user_text)[:_MAX_ATTR_CHARS]
                 if answer:
-                    new_attrs["output"] = _redact(answer)[:_MAX_ATTR_CHARS]
+                    new_attrs["output"] = self._redact(answer)[:_MAX_ATTR_CHARS]
         elif operation == "chat":
             name = "gen_ai.chat"
             kind = SpanKind.CLIENT
@@ -220,7 +224,7 @@ class WxoSpanExporter(SpanExporter):
             failed = attrs.get("gen_ai.tool.status") != "success" or "FAILURE" in result
             new_attrs["tool.business_outcome"] = "failed" if failed else "success"
             if self._capture_content and result:
-                new_attrs["tool.output"] = _redact(result)[:_MAX_ATTR_CHARS]
+                new_attrs["tool.output"] = self._redact(result)[:_MAX_ATTR_CHARS]
 
         # Events carry prompts, tool arguments and results; never forwarded (may contain PII).
         # Structured gen_ai.*.messages attributes break Orchestrate's trace view, so none are set.
@@ -285,6 +289,10 @@ def enable_wxo_telemetry(token_provider: Callable[[], tuple[str, float]] | None 
         logger.warning("WXO_ENVIRONMENT_NAME must be live or draft; telemetry disabled")
         return False
 
+    redact_secrets = os.getenv("WXO_REDACT_SECRETS", "true").strip().lower() != "false"
+    if not redact_secrets:
+        logger.warning("SECRET MASKING IS OFF: PINs are sent to Orchestrate unmasked (%s)", environment)
+
     provider = trace.get_tracer_provider()
     if not hasattr(provider, "add_span_processor"):  # local run: no SDK provider configured yet
         provider = TracerProvider()
@@ -299,6 +307,7 @@ def enable_wxo_telemetry(token_provider: Callable[[], tuple[str, float]] | None 
         capture_content=os.getenv("WXO_CAPTURE_CONTENT", "true").strip().lower() != "false",
         base_resource=getattr(provider, "resource", Resource.get_empty()),
         token_provider=token_provider or _exchange_token,
+        redact_secrets=redact_secrets,
     )
     provider.add_span_processor(BatchSpanProcessor(exporter, schedule_delay_millis=2000))
     _installed = True
