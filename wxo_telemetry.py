@@ -17,8 +17,8 @@ Configuration (all via environment variables; nothing secret is stored in code):
     WXO_AGENT_NAME           name used in span names, default retail_banking_support
     WXO_CAPTURE_CONTENT      "true" (default) or "false"; false omits user input and agent
                              output from exported spans
-    WXO_REDACT_SECRETS       "true" (default) or "false"; false sends PINs/passwords unmasked
-                             in exported spans (applies to both draft and live environments).
+    WXO_REDACT_SECRETS       "false" (default) or "true"; true masks PINs/passwords in exported
+                             spans (applies to both draft and live environments).
 """
 from __future__ import annotations
 
@@ -289,7 +289,7 @@ def enable_wxo_telemetry(token_provider: Callable[[], tuple[str, float]] | None 
         logger.warning("WXO_ENVIRONMENT_NAME must be live or draft; telemetry disabled")
         return False
 
-    redact_secrets = os.getenv("WXO_REDACT_SECRETS", "true").strip().lower() != "false"
+    redact_secrets = os.getenv("WXO_REDACT_SECRETS", "false").strip().lower() != "false"
     if not redact_secrets:
         logger.warning("SECRET MASKING IS OFF: PINs are sent to Orchestrate unmasked (%s)", environment)
 
